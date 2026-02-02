@@ -51,8 +51,6 @@ pub struct TilePath {
 }
 
 
-
-
 pub static LAYERS_CACHE: Lazy<RwLock<Option<Vec<Layer>>>> =
     Lazy::new(|| RwLock::new(None));
 
@@ -169,44 +167,6 @@ pub async fn get_layers (db_pool: web::Data<PgPool>) -> impl Responder {
 
 
 
-pub async fn create_index(
-    db_pool: &PgPool,
-    schema: &str,
-    table: &str,
-    geom_col: &str,
-) -> Result<(), sqlx::Error> {
-    // 1️⃣ Cek apakah index sudah ada
-    let index_check_sql = r#"
-        SELECT indexname 
-        FROM pg_indexes 
-        WHERE schemaname = $1 AND tablename = $2 AND indexname = $3
-    "#;
-
-    // Nama index: idx_{table}_{geom}_gist
-    let index_name = format!("idx_{}_{}_gist", table, geom_col);
-
-    let index_exists: Option<(String,)> = sqlx::query_as(index_check_sql)
-        .bind(schema)
-        .bind(table)
-        .bind(&index_name)
-        .fetch_optional(db_pool)
-        .await?;
-
-    // 2️⃣ Buat index kalau belum ada
-    if index_exists.is_none() {
-        let create_index_sql = format!(
-            "CREATE INDEX IF NOT EXISTS {} ON {}.{} USING GIST({})",
-            index_name, schema, table, geom_col
-        );
-        sqlx::query(&create_index_sql)
-            .execute(db_pool)
-            .await?;
-        println!("Created GiST index: {}.{}", schema, index_name);
-    }
-
-    Ok(())
-}
-
 
 pub async fn load_layers(db_pool: &PgPool) -> Result<Vec<Layer>, sqlx::Error> {
     let rows = sqlx::query(
@@ -219,6 +179,7 @@ pub async fn load_layers(db_pool: &PgPool) -> Result<Vec<Layer>, sqlx::Error> {
     .await?;
 
     let mut layers: Vec<Layer> = Vec::new();
+    // utils::cleanup_all_geom_3857(&db_pool).await?;
 
     for t in rows {
         let schema: String = t.try_get("f_table_schema")?;
@@ -229,13 +190,13 @@ pub async fn load_layers(db_pool: &PgPool) -> Result<Vec<Layer>, sqlx::Error> {
 
 
         // Create Index if not Exist
-        create_index(db_pool, &schema, &table, &geom_col).await?;
-
+        
+        // utils::create_geom_3857_index(db_pool, &schema, &table, &geom_col, &geom_type).await?;
+        
         
 
 
         // Generate Min Max Bounds
-
         let sql = format!(
             "SELECT \
                 ST_XMin(ST_Extent({geom})) AS minx, \
@@ -260,7 +221,6 @@ pub async fn load_layers(db_pool: &PgPool) -> Result<Vec<Layer>, sqlx::Error> {
 
         layers.push(Layer::new(table, geom_col, geom_type, srid, bbox));
     }
-
     Ok(layers)
 }
 
@@ -302,26 +262,43 @@ pub async fn get_vector_tile(
     // 2️⃣ Hitung bounding box tile Web Mercator
     let tile_bbox = utils::tile_to_bbox(params.z, params.x, params.y);
 
-    // 3️⃣ Buat SQL ST_AsMVT
     let sql = format!(
-        r#"
-        WITH mvtgeom AS (
-            SELECT ST_AsMVTGeom(
-                ST_Transform({geom_col}, 3857),
-                ST_MakeEnvelope({minx}, {miny}, {maxx}, {maxy}, 3857)
-            ) AS geom
-            FROM {table}
-        )
-        SELECT ST_AsMVT(mvtgeom.*, '{table}', 4096, 'geom') AS tile
-        FROM mvtgeom
-        "#,
-        geom_col = layer.geom_column,
-        table = layer.table_name,
-        minx = tile_bbox.minx,
-        miny = tile_bbox.miny,
-        maxx = tile_bbox.maxx,
-        maxy = tile_bbox.maxy
-    );
+            r#"
+            SELECT ST_AsMVT(q, '{table}', 4096, 'geom') AS tile
+            FROM (
+                SELECT 
+                    ST_AsMVTGeom(
+                        ST_Transform(
+                            CASE
+                                WHEN {z} >= 12 THEN {geom_col}
+                                ELSE ST_SimplifyVW(
+                                    {geom_col}, 
+                                    0.000001 * POWER(2, 12 - {z})
+                                )
+                            END,
+                            3857
+                        ),
+                        ST_MakeEnvelope({minx}, {miny}, {maxx}, {maxy}, 3857),
+                        4096,
+                        256,
+                        true
+                    ) AS geom
+                FROM {table}
+                WHERE {geom_col} && ST_Transform(
+                    ST_MakeEnvelope({minx}, {miny}, {maxx}, {maxy}, 3857),
+                    ST_SRID({geom_col})
+                )
+            ) AS q
+            WHERE q.geom IS NOT NULL;
+            "#,
+            z = params.z,
+            geom_col = layer.geom_column,
+            table = layer.table_name,
+            minx = tile_bbox.minx,
+            miny = tile_bbox.miny,
+            maxx = tile_bbox.maxx,
+            maxy = tile_bbox.maxy
+        );
 
     // 4️⃣ Query ke PostGIS
     let row = sqlx::query(&sql).fetch_one(db_pool.get_ref()).await;

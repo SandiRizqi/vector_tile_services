@@ -4,8 +4,8 @@ use actix_web::middleware::Logger;
 use sqlx::postgres::PgPoolOptions;
 use log::{info, error};
 use dotenv::dotenv;
-use vector_tile_services::web::{web_handler};
-
+use vector_tile_services::web::{web_handler, utils};
+use std::time::Duration;
 
 
 #[actix_web::main]
@@ -17,7 +17,11 @@ async fn main() -> std::io::Result<()> {
         .expect("DATABASE_URL must be set in .env");
 
     let pool = PgPoolOptions::new()
-    .max_connections(20)         // set max pool size
+    .max_connections(20)
+    .min_connections(3)            // keep-alive connections
+    .acquire_timeout(Duration::from_secs(3))
+    .idle_timeout(Duration::from_secs(600))
+    .max_lifetime(Duration::from_secs(1800))       // set max pool size
     .connect(&db_url)
     .await
     .expect("Failed to connect to database");
@@ -40,6 +44,15 @@ async fn main() -> std::io::Result<()> {
         }
         Err(e) => error!("Failed to load layers cache: {:?}", e),
     };
+
+    match utils::check_and_create_geom_index(&pool).await {
+        Ok(()) => {
+            info!("Checking geom success!");
+        }
+        Err(e) => error!("Failed to check geom status: {:?}", e),
+    };
+
+    
 
 
     
