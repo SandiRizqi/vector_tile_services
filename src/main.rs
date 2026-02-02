@@ -28,8 +28,12 @@ async fn main() -> std::io::Result<()> {
 
 
 
-    let port:u16 = 8080;
-    let host : &str = "127.0.0.1";
+    let port: u16 = std::env::var("PORT")
+    .unwrap_or_else(|_| "8080".to_string())
+    .parse()
+    .expect("PORT must be a number");
+
+    let host = "0.0.0.0";
 
     env_logger::init();
     info!("Loading layers... .");
