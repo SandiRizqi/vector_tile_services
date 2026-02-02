@@ -234,28 +234,28 @@ pub async fn load_layers(db_pool: &PgPool, req: HttpRequest) -> Result<Vec<Layer
 }
 
 
-// async fn get_layer_detail(table_name: String) -> Option<Layer> {
-//     // 1️⃣ Ambil guard terlebih dahulu
-//     let cache_guard = LAYERS_CACHE.read().await;
-//     // 2️⃣ Ambil reference ke Vec<Layer>
-//     let layers = match cache_guard.as_ref() {
-//         Some(l) => l,
-//         None => {
-//             error!("Cache not loaded");
-//             return None;
-//         }
-//     };
-//     // 3️⃣ Cari layer
-//     let layer = match layers.iter().find(|l| l.table_name == table_name) {
-//         Some(l) => l.clone(), // perlu clone karena kita return owned Layer
-//         None => {
-//             error!("Layer not found: {}", table_name);
-//             return None;
-//         }
-//     };
+async fn get_layer_detail(table_name: String) -> Option<Layer> {
+    // 1️⃣ Ambil guard terlebih dahulu
+    let cache_guard = LAYERS_CACHE.read().await;
+    // 2️⃣ Ambil reference ke Vec<Layer>
+    let layers = match cache_guard.as_ref() {
+        Some(l) => l,
+        None => {
+            error!("Cache not loaded");
+            return None;
+        }
+    };
+    // 3️⃣ Cari layer
+    let layer = match layers.iter().find(|l| l.table_name == table_name) {
+        Some(l) => l.clone(), // perlu clone karena kita return owned Layer
+        None => {
+            error!("Layer not found: {}", table_name);
+            return None;
+        }
+    };
 
-//     Some(layer)
-// }
+    Some(layer)
+}
 
 
 pub async fn get_layer_detail_from_db(db_pool: &PgPool, table_name: String, base_url: &str) -> Option<Layer> {
@@ -299,18 +299,17 @@ pub async fn get_layer_detail_from_db(db_pool: &PgPool, table_name: String, base
 pub async fn get_vector_tile(
     db_pool: web::Data<PgPool>,
     path: web::Path<TilePath>,
-    req: HttpRequest
 ) -> impl Responder {
     let params = path.into_inner();
 
     info!("Tile request: {}/{}/{}/{}", params.table_name, params.z, params.x, params.y);
 
-    let base_url = {
-        let c = req.connection_info();
-        format!("{}://{}", c.scheme(), c.host())
-    };
+    // let base_url = {
+    //     let c = req.connection_info();
+    //     format!("{}://{}", c.scheme(), c.host())
+    // };
 
-    let layer = match get_layer_detail_from_db(&db_pool, params.table_name, &base_url).await {
+    let layer = match get_layer_detail(params.table_name).await {
         Some(l) => l,
         None => {
             error!("Layer not found:");
