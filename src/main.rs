@@ -40,14 +40,14 @@ async fn main() -> std::io::Result<()> {
     
 
     // 2️⃣ Preload cache saat start
-    match web_handler::load_layers(&pool).await {
-        Ok(layers) => {
-            let mut cache = web_handler::LAYERS_CACHE.write().await;
-            *cache = Some(layers);
-            info!("Layers cache loaded at startup!");
-        }
-        Err(e) => error!("Failed to load layers cache: {:?}", e),
-    };
+    // match web_handler::load_layers(&pool).await {
+    //     Ok(layers) => {
+    //         let mut cache = web_handler::LAYERS_CACHE.write().await;
+    //         *cache = Some(layers);
+    //         info!("Layers cache loaded at startup!");
+    //     }
+    //     Err(e) => error!("Failed to load layers cache: {:?}", e),
+    // };
 
     match utils::check_and_create_geom_index(&pool).await {
         Ok(()) => {

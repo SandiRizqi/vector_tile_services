@@ -1,10 +1,10 @@
-use actix_web::{web, HttpResponse, Responder};
+use actix_web::{web, HttpResponse, Responder, HttpRequest};
 use sqlx::PgPool;
 use sqlx::Row;
 use serde::{Serialize, Deserialize};
 use once_cell::sync::Lazy;
 use tokio::sync::RwLock;
-use log::{error};
+use log::{error, info};
 use super::utils; 
 
 
@@ -19,7 +19,7 @@ pub struct Layer {
 }
 
 impl Layer {
-    fn new(table_name: String, geom_column: String, geom_type: String, srid: i32, bbox: [f64; 4],) -> Self {
+    fn new(table_name: String, geom_column: String, geom_type: String, srid: i32, bbox: [f64; 4],base_url:String) -> Self {
         let mut layer = Self {
                 table_name: table_name.to_string(), 
                 geom_column: geom_column.to_string(), 
@@ -29,13 +29,13 @@ impl Layer {
                 url: String::new(), 
             };
 
-        layer.url = layer.generate_url();
+        layer.url = layer.generate_url(base_url);
         layer
 
     }
 
-    fn generate_url (&self) -> String {
-        format!("/tiles/{}/{{z}}/{{x}}/{{y}}.pbf", self.table_name)
+    fn generate_url (&self, base_url:String) -> String {
+        format!("{}/tiles/{}/{{z}}/{{x}}/{{y}}.pbf", base_url, self.table_name)
     }
     
 }
@@ -55,7 +55,16 @@ pub static LAYERS_CACHE: Lazy<RwLock<Option<Vec<Layer>>>> =
 
 
 
-pub async fn index() -> HttpResponse {
+pub async fn index(pool: web::Data<PgPool>, req: HttpRequest) -> HttpResponse {
+
+    match load_layers(&pool, req).await {
+        Ok(layers) => {
+            let mut cache = LAYERS_CACHE.write().await;
+            *cache = Some(layers);
+            info!("Layers cache loaded at startup!");
+        }
+        Err(e) => error!("Failed to load layers cache: {:?}", e),
+    };
     HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")
         .body(include_str!("../../static/index.html"))
@@ -79,7 +88,7 @@ pub async fn layer_list() -> HttpResponse {
 
 
 
-pub async fn get_layers (db_pool: web::Data<PgPool>) -> impl Responder {
+pub async fn get_layers (db_pool: web::Data<PgPool>, req: HttpRequest) -> impl Responder {
 
      {
         let cache = LAYERS_CACHE.read().await;
@@ -108,6 +117,8 @@ pub async fn get_layers (db_pool: web::Data<PgPool>) -> impl Responder {
     };
 
     let mut layers: Vec<Layer> = Vec::new();
+
+      
 
     for t in rows {
         let schema: String = t.try_get("f_table_schema").unwrap();
@@ -140,7 +151,12 @@ pub async fn get_layers (db_pool: web::Data<PgPool>) -> impl Responder {
             row.try_get::<f64, _>("maxy").unwrap_or(0.0),
         ];
 
-        layers.push(Layer::new(table, geom_col, geom_type, srid, bbox));
+        let base_url = {
+            let c = req.connection_info();
+            format!("{}://{}", c.scheme(), c.host())
+        };
+
+        layers.push(Layer::new(table, geom_col, geom_type, srid, bbox, base_url));
     }
 
 
@@ -155,7 +171,7 @@ pub async fn get_layers (db_pool: web::Data<PgPool>) -> impl Responder {
 
 
 
-pub async fn load_layers(db_pool: &PgPool) -> Result<Vec<Layer>, sqlx::Error> {
+pub async fn load_layers(db_pool: &PgPool, req: HttpRequest) -> Result<Vec<Layer>, sqlx::Error> {
     let rows = sqlx::query(
         r#"
         SELECT f_table_schema, f_table_name, f_geometry_column, type, srid
@@ -206,7 +222,12 @@ pub async fn load_layers(db_pool: &PgPool) -> Result<Vec<Layer>, sqlx::Error> {
             row.try_get::<f64, _>("maxy").unwrap_or(0.0),
         ];
 
-        layers.push(Layer::new(table, geom_col, geom_type, srid, bbox));
+        let base_url = {
+            let c = req.connection_info();
+            format!("{}://{}", c.scheme(), c.host())
+        };
+
+        layers.push(Layer::new(table, geom_col, geom_type, srid, bbox, base_url));
     }
     Ok(layers)
 }
