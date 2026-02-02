@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Available Layers - Vector Tiles Service</title>
+    <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
+    <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+            padding: 40px 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 40px;
+        }
+
+        .header h1 {
+            font-size: 2em;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .nav {
+            background: #fafafa;
+            padding: 15px 40px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .nav a {
+            color: #2c3e50;
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.95em;
+        }
+
+        .nav a:hover {
+            color: #34495e;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 60px 20px;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #2c3e50;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            color: #666;
+            font-size: 1em;
+        }
+
+        .layer-count {
+            background: #fafafa;
+            padding: 15px 20px;
+            border-radius: 6px;
+            border-left: 3px solid #2c3e50;
+            margin-bottom: 30px;
+            font-size: 0.95em;
+            color: #555;
+        }
+
+        .layer-count strong {
+            color: #2c3e50;
+        }
+
+        .search-box {
+            margin-bottom: 25px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 12px 20px;
+            font-size: 1em;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        .search-input:focus {
+            border-color: #2c3e50;
+        }
+
+        .layer-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 20px;
+        }
+
+        .layer-card {
+            background: #fafafa;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            padding: 25px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .layer-card:hover {
+            border-color: #2c3e50;
+            box-shadow: 0 2px 8px rgba(44, 62, 80, 0.1);
+        }
+
+        .layer-card:hover::after {
+            content: 'Klik untuk preview';
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: #2c3e50;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.75em;
+        }
+
+        .layer-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .layer-name {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: #2c3e50;
+            word-break: break-word;
+        }
+
+        .layer-type {
+            background: #2c3e50;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        .layer-details {
+            display: grid;
+            gap: 12px;
+            margin-top: 15px;
+        }
+
+        .detail-row {
+            display: flex;
+            gap: 10px;
+            font-size: 0.95em;
+        }
+
+        .detail-label {
+            font-weight: 600;
+            color: #555;
+            min-width: 120px;
+        }
+
+        .detail-value {
+            color: #666;
+            font-family: 'Courier New', monospace;
+            word-break: break-all;
+        }
+
+        .url-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .url-text {
+            flex: 1;
+            font-family: 'Courier New', monospace;
+            font-size: 0.8em;
+            color: #666;
+            word-break: break-all;
+        }
+
+        .copy-btn {
+            background: #2c3e50;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.75em;
+            white-space: nowrap;
+            transition: background 0.3s;
+        }
+
+        .copy-btn:hover {
+            background: #34495e;
+        }
+
+        .copy-btn.copied {
+            background: #27ae60;
+        }
+
+        .bbox-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            margin-top: 5px;
+        }
+
+        .bbox-item {
+            background: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            border: 1px solid #e0e0e0;
+            font-size: 0.85em;
+        }
+
+        .bbox-label {
+            font-weight: 600;
+            color: #555;
+            display: block;
+            font-size: 0.85em;
+            margin-bottom: 3px;
+        }
+
+        .bbox-value {
+            color: #2c3e50;
+            font-family: 'Courier New', monospace;
+        }
+
+        .error {
+            background: #fee;
+            border: 1px solid #fcc;
+            border-radius: 6px;
+            padding: 20px;
+            color: #c33;
+            text-align: center;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+
+        .empty-state h3 {
+            font-size: 1.3em;
+            margin-bottom: 10px;
+            color: #555;
+        }
+
+        .footer {
+            background: #fafafa;
+            padding: 20px 40px;
+            text-align: center;
+            border-top: 1px solid #e0e0e0;
+            margin-top: 20px;
+        }
+
+        .footer p {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal-content {
+            position: relative;
+            background-color: white;
+            margin: 2% auto;
+            width: 95%;
+            max-width: 1400px;
+            height: 90%;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-header {
+            background: #2c3e50;
+            color: white;
+            padding: 20px 30px;
+            border-radius: 8px 8px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            font-size: 1.5em;
+            font-weight: 600;
+        }
+
+        .close {
+            color: white;
+            font-size: 2em;
+            font-weight: bold;
+            cursor: pointer;
+            line-height: 1;
+            transition: color 0.3s;
+        }
+
+        .close:hover {
+            color: #ddd;
+        }
+
+        .map-container {
+            flex: 1;
+            position: relative;
+            border-radius: 0 0 8px 8px;
+            overflow: hidden;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+
+        .map-info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            z-index: 1;
+            max-width: 300px;
+        }
+
+        .map-info h4 {
+            margin-bottom: 8px;
+            color: #2c3e50;
+        }
+
+        .map-info p {
+            font-size: 0.85em;
+            color: #666;
+            margin: 4px 0;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.6em;
+            }
+
+            .content {
+                padding: 25px;
+            }
+
+            .nav {
+                padding: 15px 25px;
+            }
+
+            .layer-header {
+                flex-direction: column;
+                align-items: start;
+            }
+
+            .bbox-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .detail-row {
+                flex-direction: column;
+                gap: 5px;
+            }
+
+            .detail-label {
+                min-width: auto;
+            }
+
+            .modal-content {
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                border-radius: 0;
+            }
+
+            .modal-header {
+                border-radius: 0;
+            }
+
+            .map-info {
+                max-width: 200px;
+                font-size: 0.9em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Available Layers</h1>
+            <p>Daftar layer yang tersedia di Vector Tiles Service</p>
+        </div>
+
+        <div class="nav">
+            <a href="/">← Kembali ke Halaman Utama</a>
+        </div>
+
+        <div class="content">
+            <div id="loading" class="loading">
+                <div class="spinner"></div>
+                <div class="loading-text">Memuat daftar layers...</div>
+            </div>
+
+            <div id="content-area" style="display: none;">
+                <div class="layer-count" id="layer-count"></div>
+                <div class="search-box">
+                    <input 
+                        type="text" 
+                        class="search-input" 
+                        id="searchInput" 
+                        placeholder="Cari layer berdasarkan nama..."
+                    />
+                </div>
+                <div class="layer-grid" id="layer-list"></div>
+            </div>
+
+            <div id="error" class="error" style="display: none;"></div>
+        </div>
+
+        <div class="footer">
+            <p>Vector Tiles Service - Powered by Actix Web & Rust</p>
+        </div>
+    </div>
+
+    <div id="mapModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title" id="modalTitle">Layer Preview</div>
+                <span class="close" id="closeModal">&times;</span>
+            </div>
+            <div class="map-container">
+                <div id="map"></div>
+                <div class="map-info" id="mapInfo"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let map = null;
+
+        function showMapPreview(layer) {
+            const modal = document.getElementById('mapModal');
+            const modalTitle = document.getElementById('modalTitle');
+            const mapInfo = document.getElementById('mapInfo');
+            
+            modal.style.display = 'block';
+            modalTitle.textContent = `Preview: ${layer.table_name}`;
+            
+            const bbox = layer.bbox || [];
+            const [minX, minY, maxX, maxY] = bbox;
+            
+            mapInfo.innerHTML = `
+                <h4>${layer.table_name}</h4>
+                <p><strong>Type:</strong> ${layer.geom_type}</p>
+                <p><strong>SRID:</strong> ${layer.srid}</p>
+            `;
+            
+            // Destroy existing map if any
+            if (map) {
+                map.remove();
+            }
+            
+            // Calculate center
+            const centerLng = (minX + maxX) / 2;
+            const centerLat = (minY + maxY) / 2;
+            
+            // Initialize map
+            map = new maplibregl.Map({
+                container: 'map',
+                style: {
+                    version: 8,
+                    sources: {
+                        'osm': {
+                            type: 'raster',
+                            tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+                            tileSize: 256,
+                            attribution: '&copy; OpenStreetMap Contributors'
+                        }
+                    },
+                    layers: [
+                        {
+                            id: 'osm',
+                            type: 'raster',
+                            source: 'osm',
+                            minzoom: 0,
+                            maxzoom: 19
+                        }
+                    ]
+                },
+                center: [centerLng, centerLat],
+                zoom: 5
+            });
+
+            map.addControl(new maplibregl.NavigationControl());
+            
+            map.on('load', () => {
+                // Use the layer's specific URL from the API response
+                const tileUrl = layer.url || window.location.origin + '/tiles/{z}/{x}/{y}.pbf';
+                
+                // Add vector tile source
+                map.addSource('vector-tiles', {
+                    type: 'vector',
+                    tiles: [tileUrl],
+                    minzoom: 0,
+                    maxzoom: 14
+                });
+
+                // Add layer based on geometry type
+                const layerId = layer.table_name;
+                const geomType = layer.geom_type.toUpperCase();
+                
+                if (geomType.includes('POINT')) {
+                    map.addLayer({
+                        id: layerId,
+                        type: 'circle',
+                        source: 'vector-tiles',
+                        'source-layer': layer.table_name,
+                        paint: {
+                            'circle-radius': 6,
+                            'circle-color': '#e74c3c',
+                            'circle-stroke-width': 2,
+                            'circle-stroke-color': '#fff'
+                        }
+                    });
+                } else if (geomType.includes('LINESTRING')) {
+                    map.addLayer({
+                        id: layerId,
+                        type: 'line',
+                        source: 'vector-tiles',
+                        'source-layer': layer.table_name,
+                        paint: {
+                            'line-color': '#3498db',
+                            'line-width': 3
+                        }
+                    });
+                } else if (geomType.includes('POLYGON') || geomType === 'GEOMETRY') {
+                    map.addLayer({
+                        id: layerId + '-fill',
+                        type: 'fill',
+                        source: 'vector-tiles',
+                        'source-layer': layer.table_name,
+                        paint: {
+                            'fill-color': '#3498db',
+                            'fill-opacity': 0.4
+                        }
+                    });
+                    
+                    map.addLayer({
+                        id: layerId + '-outline',
+                        type: 'line',
+                        source: 'vector-tiles',
+                        'source-layer': layer.table_name,
+                        paint: {
+                            'line-color': '#2980b9',
+                            'line-width': 2
+                        }
+                    });
+                }
+
+                // Fit to bounds if bbox is available
+                if (bbox.length === 4 && minX !== maxX && minY !== maxY) {
+                    map.fitBounds([[minX, minY], [maxX, maxY]], {
+                        padding: 50,
+                        duration: 1000
+                    });
+                }
+            });
+        }
+
+        function closeMapModal() {
+            const modal = document.getElementById('mapModal');
+            modal.style.display = 'none';
+            if (map) {
+                map.remove();
+                map = null;
+            }
+        }
+
+        // Close modal handlers
+        document.getElementById('closeModal').onclick = closeMapModal;
+        window.onclick = function(event) {
+            const modal = document.getElementById('mapModal');
+            if (event.target === modal) {
+                closeMapModal();
+            }
+        };
+
+        async function fetchLayers() {
+            const loadingEl = document.getElementById('loading');
+            const contentEl = document.getElementById('content-area');
+            const errorEl = document.getElementById('error');
+            const layerListEl = document.getElementById('layer-list');
+            const layerCountEl = document.getElementById('layer-count');
+            const searchInput = document.getElementById('searchInput');
+
+            let allLayers = [];
+
+            function copyToClipboard(text, button) {
+                navigator.clipboard.writeText(text).then(() => {
+                    const originalText = button.textContent;
+                    button.textContent = 'Copied!';
+                    button.classList.add('copied');
+                    
+                    setTimeout(() => {
+                        button.textContent = originalText;
+                        button.classList.remove('copied');
+                    }, 2000);
+                }).catch(err => {
+                    console.error('Failed to copy:', err);
+                });
+            }
+
+            function renderLayers(layers) {
+                layerListEl.innerHTML = '';
+                
+                if (layers.length === 0) {
+                    layerListEl.innerHTML = `
+                        <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: #666;">
+                            Tidak ada layer yang sesuai dengan pencarian
+                        </div>
+                    `;
+                    return;
+                }
+
+                layers.forEach((layer) => {
+                    const card = document.createElement('div');
+                    card.className = 'layer-card';
+                    
+                    const bbox = layer.bbox || [];
+                    const [minX, minY, maxX, maxY] = bbox;
+                    
+                    card.innerHTML = `
+                        <div class="layer-header">
+                            <div class="layer-name">${layer.table_name}</div>
+                            <div class="layer-type">${layer.geom_type}</div>
+                        </div>
+                        <div class="layer-details">
+                            <div class="detail-row">
+                                <div class="detail-label">SRID:</div>
+                                <div class="detail-value">${layer.srid}</div>
+                            </div>
+                            <div class="detail-row" style="flex-direction: column; gap: 8px;">
+                                <div class="detail-label">Tile URL:</div>
+                                <div class="url-container">
+                                    <div class="url-text" id="url-${layer.table_name}">${layer.url || 'N/A'}</div>
+                                    <button class="copy-btn" data-url="${layer.url}">Copy</button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    // Add click handler to show map preview (except when clicking copy button)
+                    card.addEventListener('click', (e) => {
+                        if (!e.target.classList.contains('copy-btn')) {
+                            showMapPreview(layer);
+                        }
+                    });
+
+                    // Add copy button handler
+                    const copyBtn = card.querySelector('.copy-btn');
+                    copyBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        copyToClipboard(layer.url, copyBtn);
+                    });
+                    
+                    layerListEl.appendChild(card);
+                });
+            }
+
+            function filterLayers(searchTerm) {
+                const filtered = allLayers.filter(layer => 
+                    layer.table_name.toLowerCase().includes(searchTerm.toLowerCase())
+                );
+                
+                layerCountEl.innerHTML = searchTerm 
+                    ? `Menampilkan <strong>${filtered.length}</strong> dari <strong>${allLayers.length}</strong> layer`
+                    : `Ditemukan <strong>${allLayers.length}</strong> layer tersedia`;
+                
+                renderLayers(filtered);
+            }
+
+            try {
+                const res = await fetch('/layers');
+                
+                if (!res.ok) {
+                    throw new Error(`HTTP error! status: ${res.status}`);
+                }
+                
+                const data = await res.json();
+                
+                loadingEl.style.display = 'none';
+                
+                if (data.length === 0) {
+                    contentEl.innerHTML = `
+                        <div class="empty-state">
+                            <h3>Tidak ada layer tersedia</h3>
+                            <p>Belum ada layer yang dikonfigurasi di database.</p>
+                        </div>
+                    `;
+                    contentEl.style.display = 'block';
+                    return;
+                }
+
+                allLayers = data;
+                layerCountEl.innerHTML = `Ditemukan <strong>${data.length}</strong> layer tersedia`;
+                
+                renderLayers(allLayers);
+                
+                // Add search functionality
+                searchInput.addEventListener('input', (e) => {
+                    filterLayers(e.target.value);
+                });
+                
+                contentEl.style.display = 'block';
+                
+            } catch (error) {
+                console.error('Error fetching layers:', error);
+                loadingEl.style.display = 'none';
+                errorEl.textContent = `Error: ${error.message}. Gagal memuat daftar layers.`;
+                errorEl.style.display = 'block';
+            }
+        }
+
+        fetchLayers();
+    </script>
+</body>
+</html>

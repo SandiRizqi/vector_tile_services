@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vector Tiles Service</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+            padding: 40px 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 40px;
+        }
+
+        .header h1 {
+            font-size: 2em;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .status {
+            display: inline-block;
+            background: #27ae60;
+            color: white;
+            padding: 6px 14px;
+            border-radius: 4px;
+            margin-top: 15px;
+            font-size: 0.9em;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .section {
+            margin-bottom: 40px;
+        }
+
+        .section h2 {
+            font-size: 1.5em;
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        .section p {
+            font-size: 1em;
+            line-height: 1.7;
+            color: #555;
+            margin-bottom: 15px;
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .feature-card {
+            background: #fafafa;
+            padding: 20px;
+            border-radius: 6px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .feature-card h3 {
+            font-size: 1.1em;
+            color: #2c3e50;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .feature-card p {
+            font-size: 0.95em;
+            color: #666;
+            line-height: 1.5;
+            margin: 0;
+        }
+
+        .endpoints {
+            background: #fafafa;
+            padding: 20px;
+            border-radius: 6px;
+            border-left: 3px solid #2c3e50;
+        }
+
+        .endpoint {
+            font-family: 'Courier New', monospace;
+            background: white;
+            padding: 12px 16px;
+            margin: 10px 0;
+            border-radius: 4px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .method {
+            background: #2c3e50;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 3px;
+            font-weight: 600;
+            font-size: 0.85em;
+            margin-right: 10px;
+        }
+
+        .path {
+            color: #333;
+        }
+
+        .tech-stack {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 15px;
+        }
+
+        .tech-badge {
+            background: #ecf0f1;
+            color: #2c3e50;
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-weight: 500;
+            font-size: 0.9em;
+        }
+
+        .footer {
+            background: #fafafa;
+            padding: 25px 40px;
+            text-align: center;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .footer p {
+            color: #666;
+            margin: 5px 0;
+            font-size: 0.95em;
+        }
+
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.9em;
+        }
+
+        pre {
+            background: #f4f4f4;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin-top: 10px;
+            border: 1px solid #e0e0e0;
+            font-size: 0.9em;
+        }
+
+        .button {
+            display: inline-block;
+            background: #2c3e50;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: background 0.3s ease;
+        }
+
+        .button:hover {
+            background: #34495e;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.6em;
+            }
+
+            .content {
+                padding: 25px;
+            }
+
+            .section h2 {
+                font-size: 1.3em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Vector Tiles Service</h1>
+            <p>High-Performance Geospatial Data Delivery</p>
+            <div class="status">Service Running</div>
+        </div>
+
+        <div class="content">
+            <div class="section">
+                <h2>Apa itu Vector Tiles?</h2>
+                <p>
+                    Vector tiles adalah format data peta modern yang mengirimkan data geospasial dalam bentuk vektor 
+                    (titik, garis, dan poligon) daripada gambar raster. Teknologi ini memungkinkan rendering peta yang 
+                    lebih cepat, interaktif, dan dapat dikustomisasi dengan ukuran file yang lebih kecil.
+                </p>
+                <p>
+                    Service ini menyediakan vector tiles dalam format Mapbox Vector Tile (MVT/PBF), yang merupakan 
+                    standar industri untuk pemetaan web modern dengan performa tinggi.
+                </p>
+            </div>
+
+            <div class="section">
+                <h2>Fitur Utama</h2>
+                <div class="features">
+                    <div class="feature-card">
+                        <h3>Performa Tinggi</h3>
+                        <p>Dibangun dengan Actix Web dan Rust untuk kecepatan maksimal dan penggunaan resource yang efisien.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h3>Styling Fleksibel</h3>
+                        <p>Data vektor dapat di-style secara dinamis di sisi klien sesuai kebutuhan aplikasi Anda.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h3>Ukuran Optimal</h3>
+                        <p>Format PBF yang terkompresi menghasilkan ukuran transfer data minimal dengan kualitas maksimal.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h3>Standar Industri</h3>
+                        <p>Kompatibel dengan Mapbox GL JS, MapLibre, Leaflet, dan library pemetaan modern lainnya.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h3>Real-time Updates</h3>
+                        <p>Mendukung pembaruan data dinamis tanpa perlu regenerasi seluruh tileset.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h3>Multi-platform</h3>
+                        <p>Dapat digunakan di web, mobile, dan desktop dengan performa konsisten.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>Available Layers</h2>
+                <p>
+                    Lihat daftar lengkap layer yang tersedia di service ini. Setiap layer memiliki konfigurasi 
+                    dan properti yang berbeda sesuai dengan jenis data geospasial yang disediakan.
+                </p>
+                <div style="margin-top: 20px;">
+                    <a href="/layer_list" class="button">Lihat Daftar Layers</a>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>API Endpoints</h2>
+                <div class="endpoints">
+                    <div class="endpoint">
+                        <span class="method">GET</span>
+                        <span class="path">/layers</span>
+                    </div>
+                    <p style="margin-top: 10px; margin-bottom: 15px; color: #666; font-size: 0.95em;">
+                        Menampilkan daftar semua layer yang tersedia dalam format JSON.
+                    </p>
+                    
+                    <div class="endpoint">
+                        <span class="method">GET</span>
+                        <span class="path">/tiles/{table_name}/{z}/{x}/{y}.pbf</span>
+                    </div>
+                    <p style="margin-top: 10px; color: #666; font-size: 0.95em;">
+                        <strong>Parameters:</strong><br>
+                        <code>z</code> - Zoom level (0-22)<br>
+                        <code>x</code> - Tile column coordinate<br>
+                        <code>y</code> - Tile row coordinate
+                    </p>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>Technology Stack</h2>
+                <div class="tech-stack">
+                    <span class="tech-badge">Actix Web</span>
+                    <span class="tech-badge">Rust</span>
+                    <span class="tech-badge">MVT/PBF</span>
+                    <span class="tech-badge">Vector Tiles</span>
+                    <span class="tech-badge">PostgreSQL/PostGIS</span>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>Cara Menggunakan</h2>
+                <p>
+                    Integrasikan vector tiles service ini dengan library pemetaan favorit Anda seperti Mapbox GL JS 
+                    atau MapLibre GL JS. Cukup arahkan tile source ke endpoint yang tersedia dengan parameter z/x/y 
+                    yang sesuai.
+                </p>
+                <div class="endpoints">
+                    <p style="margin: 0; color: #666; font-size: 0.95em;">
+                        <strong>Contoh implementasi:</strong>
+                    </p>
+                    <pre>map.addSource('vector-tiles', {
+  type: 'vector',
+  tiles: ['http://localhost:8080/tiles/{table_name}{z}/{x}/{y}.pbf'],
+  minzoom: 0,
+  maxzoom: 14
+});</pre>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p><strong>Vector Tiles Service</strong></p>
+            <p>Powered by Actix Web & Rust</p>
+        </div>
+    </div>
+</body>
+</html>

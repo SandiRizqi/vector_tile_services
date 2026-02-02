@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>404 - Page Not Found</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 600px;
+            width: 100%;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            text-align: center;
+        }
+
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 60px 40px;
+        }
+
+        .error-code {
+            font-size: 6em;
+            font-weight: 700;
+            margin-bottom: 10px;
+            line-height: 1;
+        }
+
+        .error-message {
+            font-size: 1.5em;
+            margin-bottom: 10px;
+        }
+
+        .error-description {
+            font-size: 1em;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .content p {
+            font-size: 1em;
+            line-height: 1.7;
+            color: #555;
+            margin-bottom: 20px;
+        }
+
+        .suggestions {
+            background: #fafafa;
+            padding: 20px;
+            border-radius: 6px;
+            border: 1px solid #e0e0e0;
+            text-align: left;
+            margin-bottom: 25px;
+        }
+
+        .suggestions h3 {
+            font-size: 1.1em;
+            color: #2c3e50;
+            margin-bottom: 12px;
+            font-weight: 600;
+        }
+
+        .suggestions ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .suggestions li {
+            padding: 8px 0;
+            color: #666;
+            font-size: 0.95em;
+        }
+
+        .suggestions li:before {
+            content: "→ ";
+            color: #2c3e50;
+            font-weight: bold;
+            margin-right: 8px;
+        }
+
+        .button {
+            display: inline-block;
+            background: #2c3e50;
+            color: white;
+            padding: 12px 30px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: background 0.3s ease;
+        }
+
+        .button:hover {
+            background: #34495e;
+        }
+
+        .endpoint-example {
+            background: #fafafa;
+            padding: 15px;
+            border-radius: 4px;
+            border-left: 3px solid #2c3e50;
+            margin-top: 20px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            color: #333;
+            text-align: left;
+        }
+
+        @media (max-width: 768px) {
+            .error-code {
+                font-size: 4em;
+            }
+
+            .error-message {
+                font-size: 1.2em;
+            }
+
+            .header {
+                padding: 40px 30px;
+            }
+
+            .content {
+                padding: 30px 25px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="error-code">404</div>
+            <div class="error-message">Page Not Found</div>
+            <div class="error-description">The requested resource could not be found</div>
+        </div>
+
+        <div class="content">
+            <p>
+                Halaman atau resource yang Anda cari tidak tersedia di server ini. 
+                Pastikan URL yang Anda akses sudah benar.
+            </p>
+
+            <div class="suggestions">
+                <h3>Kemungkinan penyebab:</h3>
+                <ul>
+                    <li>URL yang dimasukkan salah atau tidak lengkap</li>
+                    <li>Resource telah dipindahkan atau dihapus</li>
+                    <li>Parameter tile (z/x/y) tidak valid</li>
+                    <li>Endpoint yang diminta tidak tersedia</li>
+                </ul>
+            </div>
+
+            <div class="suggestions">
+                <h3>Yang bisa Anda lakukan:</h3>
+                <ul>
+                    <li>Periksa kembali URL yang Anda masukkan</li>
+                    <li>Kembali ke halaman utama dan mulai dari awal</li>
+                    <li>Gunakan endpoint yang tersedia di dokumentasi</li>
+                </ul>
+            </div>
+
+            <div class="endpoint-example">
+                <strong>Contoh endpoint yang valid:</strong><br>
+                /tiles/{table_name}/{z}/{x}/{y}.pbf
+            </div>
+
+            <div style="margin-top: 30px;">
+                <a href="/" class="button">Kembali ke Halaman Utama</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
