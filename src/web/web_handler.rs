@@ -270,10 +270,18 @@ pub async fn get_vector_tile(
                     ST_AsMVTGeom(
                         ST_Transform(
                             CASE
-                                WHEN {z} >= 12 THEN {geom_col}
+                                WHEN {z} >= 17 THEN {geom_col}
+                                WHEN {z} <= 5 THEN ST_SimplifyVW(
+                                    {geom_col}, 
+                                    1e-6 * POWER(2, 17 - {z})
+                                )
+                                WHEN {z} <= 8 THEN ST_SimplifyVW(
+                                    {geom_col}, 
+                                    1e-7 * POWER(2, 17 - {z})
+                                )
                                 ELSE ST_SimplifyVW(
                                     {geom_col}, 
-                                    0.000001 * POWER(2, 12 - {z})
+                                    1e-8 * POWER(2, 17 - {z})
                                 )
                             END,
                             3857
