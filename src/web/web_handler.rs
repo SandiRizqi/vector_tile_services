@@ -1,7 +1,6 @@
 use actix_web::{web, HttpResponse, Responder};
 use sqlx::PgPool;
 use sqlx::Row;
-use std::fs;
 use serde::{Serialize, Deserialize};
 use once_cell::sync::Lazy;
 use tokio::sync::RwLock;
@@ -57,35 +56,23 @@ pub static LAYERS_CACHE: Lazy<RwLock<Option<Vec<Layer>>>> =
 
 
 pub async fn index() -> HttpResponse {
-    match fs::read_to_string("static/index.html") {
-        Ok(html) => HttpResponse::Ok()
-            .content_type("text/html; charset=utf-8")
-            .body(html),
-        Err(_) => HttpResponse::InternalServerError()
-            .body("Failed to load HTML"),
-    }
+    HttpResponse::Ok()
+        .content_type("text/html; charset=utf-8")
+        .body(include_str!("../../static/index.html"))
 }
 
 
 pub async fn not_found() -> HttpResponse {
-    match fs::read_to_string("static/404.html") {
-        Ok(html) => HttpResponse::Ok()
-            .content_type("text/html; charset=utf-8")
-            .body(html),
-        Err(_) => HttpResponse::InternalServerError()
-            .body("Failed to load HTML"),
-    }
+     HttpResponse::Ok()
+        .content_type("text/html; charset=utf-8")
+        .body(include_str!("../../static/404.html"))
 }
 
 
 pub async fn layer_list() -> HttpResponse {
-    match fs::read_to_string("static/layer_list.html") {
-        Ok(html) => HttpResponse::Ok()
-            .content_type("text/html; charset=utf-8")
-            .body(html),
-        Err(_) => HttpResponse::InternalServerError()
-            .body("Failed to load HTML"),
-    }
+     HttpResponse::Ok()
+        .content_type("text/html; charset=utf-8")
+        .body(include_str!("../../static/layer_list.html"))
 }
 
 
