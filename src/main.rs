@@ -19,7 +19,7 @@ async fn main() -> std::io::Result<()> {
     let pool = PgPoolOptions::new()
     .max_connections(50)
     .min_connections(5)            // keep-alive connections
-    .acquire_timeout(Duration::from_secs(5))
+    .acquire_timeout(Duration::from_secs(3))
     .idle_timeout(Duration::from_secs(600))
     .max_lifetime(Duration::from_secs(1800))       // set max pool size
     .connect(&db_url)

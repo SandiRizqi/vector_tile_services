@@ -561,14 +561,14 @@
             
             map.on('load', () => {
                 // Use the layer's specific URL from the API response
-                const tileUrl = layer.url || window.location.origin + '/tiles/{z}/{x}/{y}.pbf';
+                const tileUrl = layer.url || window.location.origin + `/tiles/${table_name}/{z}/{x}/{y}.pbf`;
                 
                 // Add vector tile source
                 map.addSource('vector-tiles', {
                     type: 'vector',
                     tiles: [tileUrl],
                     minzoom: 0,
-                    maxzoom: 14
+                    maxzoom: 20
                 });
 
                 // Add layer based on geometry type

@@ -6,6 +6,7 @@ use once_cell::sync::Lazy;
 use tokio::sync::RwLock;
 use log::{error, info};
 use super::utils; 
+// use vector_tile_services::utils::tile_to_bbox;
 
 
 #[derive(Serialize, Clone)]
@@ -294,12 +295,15 @@ pub async fn get_layer_detail_from_db(db_pool: &PgPool, table_name: String, base
 }
 
 
+
 pub async fn get_vector_tile(
     db_pool: web::Data<PgPool>,
     path: web::Path<TilePath>,
     req: HttpRequest
 ) -> impl Responder {
     let params = path.into_inner();
+
+    info!("Tile request: {}/{}/{}/{}", params.table_name, params.z, params.x, params.y);
 
     let base_url = {
         let c = req.connection_info();
@@ -308,35 +312,51 @@ pub async fn get_vector_tile(
 
     let layer = match get_layer_detail_from_db(&db_pool, params.table_name, &base_url).await {
         Some(l) => l,
-        None => return HttpResponse::NotFound().body("Layer not found"),
+        None => {
+            error!("Layer not found:");
+            return HttpResponse::NotFound().body("Layer not found");
+        }
     };
 
-    // Gunakan fungsi get_tile yang sudah dibuat
-    let result = sqlx::query_scalar::<_, Vec<u8>>(
-        "SELECT public.get_tile($1, $2, $3, $4, $5)"
+    let tile_bbox = utils::tile_to_bbox(params.z, params.x, params.y);
+
+    match sqlx::query_scalar::<_, Vec<u8>>(
+        "SELECT public.get_tile($1, $2, $3, $4, $5, $6, $7, $8, $9)"
     )
     .bind(&layer.table_name)
     .bind(&layer.geom_column)
     .bind(params.z as i32)
     .bind(params.x as i32)
     .bind(params.y as i32)
+    .bind(tile_bbox.minx)
+    .bind(tile_bbox.miny)
+    .bind(tile_bbox.maxx)
+    .bind(tile_bbox.maxy)
     .fetch_one(db_pool.get_ref())
-    .await;
-
-    match result {
+    .await
+    {
         Ok(tile) => {
+            info!("✓ Tile generated: {} bytes", tile.len());
+            
             if tile.is_empty() {
-                HttpResponse::NoContent().finish()
+                info!("  Empty tile - returning 204");
+                HttpResponse::NoContent()
+                    .insert_header(("Access-Control-Allow-Origin", "*"))
+                    .finish()
             } else {
                 HttpResponse::Ok()
                     .content_type("application/x-protobuf")
-                    .insert_header(("Content-Encoding", "gzip")) // opsional
+                    .insert_header(("Access-Control-Allow-Origin", "*"))
+                    .insert_header(("Cache-Control", "public, max-age=86400"))
+                    // ❌ JANGAN tambahkan Content-Encoding: gzip
                     .body(tile)
             }
         }
         Err(e) => {
-            error!("Failed to fetch vector tile: {:?}", e);
-            HttpResponse::InternalServerError().body("Failed to fetch vector tile")
+            error!("✗ Database error: {:?}", e);
+            HttpResponse::InternalServerError()
+                .content_type("text/plain")
+                .body(format!("Database error: {}", e))
         }
     }
 }
