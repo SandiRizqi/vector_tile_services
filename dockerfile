@@ -1,5 +1,5 @@
 # Multi-stage build for optimized Docker image
-FROM rust:1.75-slim as builder
+FROM rust:1.83-slim as builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
@@ -11,16 +11,7 @@ RUN apt-get update && apt-get install -y \
 # Create app directory
 WORKDIR /app
 
-# Copy manifests
-COPY Cargo.toml Cargo.lock ./
-
-# Create a dummy main.rs to cache dependencies
-RUN mkdir src && \
-    echo "fn main() {}" > src/main.rs && \
-    cargo build --release && \
-    rm -rf src
-
-# Copy actual source code
+# Copy manifests and source code
 COPY . .
 
 # Build the application
