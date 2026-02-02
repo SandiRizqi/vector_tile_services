@@ -35,7 +35,7 @@ impl Layer {
     }
 
     fn generate_url (&self) -> String {
-        format!("http://127.0.0.1:8080/tiles/{}/{{z}}/{{x}}/{{y}}.pbf", self.table_name)
+        format!("/tiles/{}/{{z}}/{{x}}/{{y}}.pbf", self.table_name)
     }
     
 }
