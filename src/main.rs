@@ -17,7 +17,7 @@ async fn main() -> std::io::Result<()> {
         .expect("DATABASE_URL must be set in .env");
 
     let pool = PgPoolOptions::new()
-    .max_connections(30)
+    .max_connections(50)
     .min_connections(5)            // keep-alive connections
     .acquire_timeout(Duration::from_secs(5))
     .idle_timeout(Duration::from_secs(600))
