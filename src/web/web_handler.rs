@@ -257,12 +257,56 @@ async fn get_layer_detail(table_name: String) -> Option<Layer> {
 }
 
 
+pub async fn get_layer_detail_from_db(db_pool: &PgPool, table_name: String, base_url: &str) -> Option<Layer> {
+    // Query ke database langsung, ambil hanya table_name & geom_column
+    let row = match sqlx::query(
+        r#"
+        SELECT f_table_name, f_geometry_column
+        FROM public.geometry_columns
+        WHERE f_table_name = $1
+        "#
+    )
+    .bind(table_name)
+    .fetch_one(db_pool)
+    .await
+    {
+        Ok(r) => r,
+        Err(e) => {
+            error!("Failed to query geometry_columns: {}", e);
+            return None;
+        }
+    };
+
+    let table_name: String = row.try_get("f_table_name").ok()?;
+    let geom_column: String = row.try_get("f_geometry_column").ok()?;
+
+    // Untuk field lain, bisa pakai default / placeholder
+    let layer = Layer::new(
+        table_name,
+        geom_column,
+        "UNKNOWN".to_string(), // placeholder
+        0 as i32,                          // placeholder
+        [0.0, 0.0, 0.0, 0.0],      // placeholder
+        base_url.to_string()
+    );
+
+    Some(layer)
+}
+
+
 pub async fn get_vector_tile(
     db_pool: web::Data<PgPool>,
     path: web::Path<TilePath>,
+    req: HttpRequest
 ) -> impl  Responder {
     let params = path.into_inner();
-    let layer = match get_layer_detail(params.table_name).await {
+
+    let base_url = {
+            let c = req.connection_info();
+            format!("{}://{}", c.scheme(), c.host())
+        };
+
+    let layer = match get_layer_detail_from_db(&db_pool, params.table_name, &base_url).await {
         Some(l) => l,
         None => return HttpResponse::NotFound().body("Layer not found"),
     };
