@@ -233,28 +233,28 @@ pub async fn load_layers(db_pool: &PgPool, req: HttpRequest) -> Result<Vec<Layer
 }
 
 
-async fn get_layer_detail(table_name: String) -> Option<Layer> {
-    // 1️⃣ Ambil guard terlebih dahulu
-    let cache_guard = LAYERS_CACHE.read().await;
-    // 2️⃣ Ambil reference ke Vec<Layer>
-    let layers = match cache_guard.as_ref() {
-        Some(l) => l,
-        None => {
-            error!("Cache not loaded");
-            return None;
-        }
-    };
-    // 3️⃣ Cari layer
-    let layer = match layers.iter().find(|l| l.table_name == table_name) {
-        Some(l) => l.clone(), // perlu clone karena kita return owned Layer
-        None => {
-            error!("Layer not found: {}", table_name);
-            return None;
-        }
-    };
+// async fn get_layer_detail(table_name: String) -> Option<Layer> {
+//     // 1️⃣ Ambil guard terlebih dahulu
+//     let cache_guard = LAYERS_CACHE.read().await;
+//     // 2️⃣ Ambil reference ke Vec<Layer>
+//     let layers = match cache_guard.as_ref() {
+//         Some(l) => l,
+//         None => {
+//             error!("Cache not loaded");
+//             return None;
+//         }
+//     };
+//     // 3️⃣ Cari layer
+//     let layer = match layers.iter().find(|l| l.table_name == table_name) {
+//         Some(l) => l.clone(), // perlu clone karena kita return owned Layer
+//         None => {
+//             error!("Layer not found: {}", table_name);
+//             return None;
+//         }
+//     };
 
-    Some(layer)
-}
+//     Some(layer)
+// }
 
 
 pub async fn get_layer_detail_from_db(db_pool: &PgPool, table_name: String, base_url: &str) -> Option<Layer> {
@@ -298,79 +298,39 @@ pub async fn get_vector_tile(
     db_pool: web::Data<PgPool>,
     path: web::Path<TilePath>,
     req: HttpRequest
-) -> impl  Responder {
+) -> impl Responder {
     let params = path.into_inner();
 
     let base_url = {
-            let c = req.connection_info();
-            format!("{}://{}", c.scheme(), c.host())
-        };
+        let c = req.connection_info();
+        format!("{}://{}", c.scheme(), c.host())
+    };
 
     let layer = match get_layer_detail_from_db(&db_pool, params.table_name, &base_url).await {
         Some(l) => l,
         None => return HttpResponse::NotFound().body("Layer not found"),
     };
 
-    // 2️⃣ Hitung bounding box tile Web Mercator
-    let tile_bbox = utils::tile_to_bbox(params.z, params.x, params.y);
+    // Gunakan fungsi get_tile yang sudah dibuat
+    let result = sqlx::query_scalar::<_, Vec<u8>>(
+        "SELECT public.get_tile($1, $2, $3, $4, $5)"
+    )
+    .bind(&layer.table_name)
+    .bind(&layer.geom_column)
+    .bind(params.z as i32)
+    .bind(params.x as i32)
+    .bind(params.y as i32)
+    .fetch_one(db_pool.get_ref())
+    .await;
 
-    let sql = format!(
-            r#"
-            SELECT ST_AsMVT(q, '{table}', 4096, 'geom') AS tile
-            FROM (
-                SELECT 
-                    ST_AsMVTGeom(
-                        ST_Transform(
-                            CASE
-                                WHEN {z} >= 17 THEN {geom_col}
-                                WHEN {z} <= 5 THEN ST_SimplifyVW(
-                                    {geom_col}, 
-                                    1e-6 * POWER(2, 17 - {z})
-                                )
-                                WHEN {z} <= 8 THEN ST_SimplifyVW(
-                                    {geom_col}, 
-                                    1e-7 * POWER(2, 17 - {z})
-                                )
-                                ELSE ST_SimplifyVW(
-                                    {geom_col}, 
-                                    1e-8 * POWER(2, 17 - {z})
-                                )
-                            END,
-                            3857
-                        ),
-                        ST_MakeEnvelope({minx}, {miny}, {maxx}, {maxy}, 3857),
-                        4096,
-                        256,
-                        true
-                    ) AS geom
-                FROM {table}
-                WHERE {geom_col} && ST_Transform(
-                    ST_MakeEnvelope({minx}, {miny}, {maxx}, {maxy}, 3857),
-                    ST_SRID({geom_col})
-                )
-            ) AS q
-            WHERE q.geom IS NOT NULL;
-            "#,
-            z = params.z,
-            geom_col = layer.geom_column,
-            table = layer.table_name,
-            minx = tile_bbox.minx,
-            miny = tile_bbox.miny,
-            maxx = tile_bbox.maxx,
-            maxy = tile_bbox.maxy
-        );
-
-    // 4️⃣ Query ke PostGIS
-    let row = sqlx::query(&sql).fetch_one(db_pool.get_ref()).await;
-
-    match row {
-        Ok(r) => {
-            let tile: Vec<u8> = r.try_get("tile").unwrap_or_default();
+    match result {
+        Ok(tile) => {
             if tile.is_empty() {
-                HttpResponse::NotFound().body("Tile empty")
+                HttpResponse::NoContent().finish()
             } else {
                 HttpResponse::Ok()
                     .content_type("application/x-protobuf")
+                    .insert_header(("Content-Encoding", "gzip")) // opsional
                     .body(tile)
             }
         }
@@ -380,7 +340,3 @@ pub async fn get_vector_tile(
         }
     }
 }
-
-
-
-

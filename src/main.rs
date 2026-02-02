@@ -4,7 +4,7 @@ use actix_web::middleware::Logger;
 use sqlx::postgres::PgPoolOptions;
 use log::{info, error};
 use dotenv::dotenv;
-use vector_tile_services::web::{web_handler, utils};
+use vector_tile_services::web::{web_handler, utils, db};
 use std::time::Duration;
 
 
@@ -25,6 +25,12 @@ async fn main() -> std::io::Result<()> {
     .connect(&db_url)
     .await
     .expect("Failed to connect to database");
+
+
+    db::run_migrations(&pool)
+        .await
+        .expect("Failed to run migrations");
+
 
 
 
