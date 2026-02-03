@@ -17,8 +17,8 @@ async fn main() -> std::io::Result<()> {
         .expect("DATABASE_URL must be set in .env");
 
     let pool = PgPoolOptions::new()
-    .max_connections(50)
-    .min_connections(5)            // keep-alive connections
+    .max_connections(16)
+    .min_connections(4)            // keep-alive connections
     .acquire_timeout(Duration::from_secs(3))
     .idle_timeout(Duration::from_secs(600))
     .max_lifetime(Duration::from_secs(1800))       // set max pool size
@@ -45,7 +45,7 @@ async fn main() -> std::io::Result<()> {
     info!("Loading layers... .");
     
 
-    // 2️⃣ Preload cache saat start
+
     // match web_handler::load_layers(&pool).await {
     //     Ok(layers) => {
     //         let mut cache = web_handler::LAYERS_CACHE.write().await;

@@ -29,6 +29,7 @@ pub async fn run_migrations(pool: &PgPool) -> Result<(), sqlx::Error> {
                 $f$
                 SELECT ST_AsMVT(q, %L, 4096, 'geom') FROM (
                     SELECT
+                        id,
                         ST_AsMVTGeom(
                             ST_Transform(
                                 CASE

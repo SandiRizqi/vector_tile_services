@@ -6,6 +6,8 @@ use once_cell::sync::Lazy;
 use tokio::sync::RwLock;
 use log::{error, info};
 use super::utils; 
+use super::cache::{S3Config, get_from_memory_cache, get_from_s3, put_to_memory_cache, put_to_s3};
+
 // use vector_tile_services::utils::tile_to_bbox;
 
 
@@ -57,6 +59,16 @@ pub static LAYERS_CACHE: Lazy<RwLock<Option<Vec<Layer>>>> =
 
 
 pub async fn index(pool: web::Data<PgPool>, req: HttpRequest) -> HttpResponse {
+
+    {
+        let cache = LAYERS_CACHE.read().await;
+        if cache.is_some() {
+            info!("Layers cache already loaded, skipping DB query");
+            return HttpResponse::Ok()
+                .content_type("text/html; charset=utf-8")
+                .body(include_str!("../../static/index.html"));
+        }
+    }
 
     match load_layers(&pool, req).await {
         Ok(layers) => {
@@ -301,15 +313,70 @@ pub async fn get_vector_tile(
     path: web::Path<TilePath>,
 ) -> impl Responder {
     let params = path.into_inner();
+    let s3_config = S3Config::default();
+
+
 
     info!("Tile request: {}/{}/{}/{}", params.table_name, params.z, params.x, params.y);
 
-    // let base_url = {
-    //     let c = req.connection_info();
-    //     format!("{}://{}", c.scheme(), c.host())
-    // };
+    // GET DATA FROM CACHE FIRST
+    if let Some(cached_tile) = get_from_memory_cache(&params.table_name, params.z, params.x, params.y).await {
+        if cached_tile.is_empty() {
+            return HttpResponse::NoContent()
+                .insert_header(("Access-Control-Allow-Origin", "*"))
+                .insert_header(("X-Cache", "MEMORY-HIT"))
+                .finish();
+        } else {
+            return HttpResponse::Ok()
+                .content_type("application/x-protobuf")
+                .insert_header(("Access-Control-Allow-Origin", "*"))
+                .insert_header(("Cache-Control", "public, max-age=86400"))
+                .insert_header(("X-Cache", "MEMORY-HIT"))
+                .body(cached_tile);
+        }
+    };
 
-    let layer = match get_layer_detail(params.table_name).await {
+
+    // GET DATA FROM S3
+    match get_from_s3(&s3_config, &params.table_name, params.z, params.x, params.y).await {
+        Ok(Some(s3_tile)) => {
+            info!("✓ S3 cache hit: {} bytes", s3_tile.len());
+            
+            put_to_memory_cache(&params.table_name, params.z, params.x, params.y, s3_tile.clone()).await;
+            
+            if s3_tile.is_empty() {
+                return HttpResponse::NoContent()
+                    .insert_header(("Access-Control-Allow-Origin", "*"))
+                    .insert_header(("X-Cache", "S3-HIT"))
+                    .finish();
+            } else {
+                return HttpResponse::Ok()
+                    .content_type("application/x-protobuf")
+                    .insert_header(("Access-Control-Allow-Origin", "*"))
+                    .insert_header(("Cache-Control", "public, max-age=86400"))
+                    .insert_header(("X-Cache", "S3-HIT"))
+                    .body(s3_tile);
+            }
+        }
+        Ok(None) => {
+            info!("✗ S3 cache miss");
+        }
+        Err(e) => {
+            error!("✗ S3 error: {:?}", e);
+        }
+    }
+
+
+
+
+
+
+
+
+
+
+
+    let layer = match get_layer_detail(params.table_name.clone()).await {
         Some(l) => l,
         None => {
             error!("Layer not found:");
@@ -336,6 +403,27 @@ pub async fn get_vector_tile(
     {
         Ok(tile) => {
             info!("✓ Tile generated: {} bytes", tile.len());
+
+            //SAVE TILE TO CACHE
+            
+            put_to_memory_cache(params.table_name.as_str(), params.z, params.x, params.y, tile.clone()).await;
+
+
+            let table_name_clone = params.table_name.clone();
+            let s3_config_clone = s3_config.clone();
+            let tile_clone = tile.clone();
+            tokio::spawn(async move {
+                if let Err(e) = put_to_s3(
+                    &s3_config_clone,
+                    &table_name_clone,
+                    params.z,
+                    params.x,
+                    params.y,
+                    tile_clone,
+                ).await {
+                    error!("Failed to save to S3: {:?}", e);
+                }
+            });
             
             if tile.is_empty() {
                 info!("  Empty tile - returning 204");
