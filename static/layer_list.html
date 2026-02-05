@@ -504,6 +504,14 @@
     <script>
         let map = null;
 
+        function webMercatorToWGS84(x, y) {
+            const lon = (x / 20037508.34) * 180;
+            let lat = (y / 20037508.34) * 180;
+            lat = 180 / Math.PI * (2 * Math.atan(Math.exp(lat * Math.PI / 180)) - Math.PI / 2);
+            return [lon, lat];
+        }
+
+
         function showMapPreview(layer) {
             const modal = document.getElementById('mapModal');
             const modalTitle = document.getElementById('modalTitle');
@@ -513,7 +521,18 @@
             modalTitle.textContent = `Preview: ${layer.table_name}`;
             
             const bbox = layer.bbox || [];
-            const [minX, minY, maxX, maxY] = bbox;
+            let [minX, minY, maxX, maxY] = bbox;
+
+
+            // ✅ Transform bbox jika SRID 3857
+            if (layer.srid === 3857) {
+                const [minLon, minLat] = webMercatorToWGS84(minX, minY);
+                const [maxLon, maxLat] = webMercatorToWGS84(maxX, maxY);
+                minX = minLon;
+                minY = minLat;
+                maxX = maxLon;
+                maxY = maxLat;
+            }
             
             mapInfo.innerHTML = `
                 <h4>${layer.table_name}</h4>

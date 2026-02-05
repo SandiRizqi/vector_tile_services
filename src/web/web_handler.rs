@@ -115,7 +115,7 @@ pub async fn get_layers (db_pool: web::Data<PgPool>, req: HttpRequest) -> impl R
      let rows= sqlx::query(
        r#"
         SELECT f_table_schema, f_table_name, f_geometry_column, type, srid
-        FROM public.geometry_columns
+        FROM public.geometry_columns WHERE f_geometry_column = 'geom_3857'
         "#
     )
     .fetch_all(pool)
@@ -188,7 +188,7 @@ pub async fn load_layers(db_pool: &PgPool, req: HttpRequest) -> Result<Vec<Layer
     let rows = sqlx::query(
         r#"
         SELECT f_table_schema, f_table_name, f_geometry_column, type, srid
-        FROM public.geometry_columns
+        FROM public.geometry_columns WHERE f_geometry_column = 'geom_3857'
         "#
     )
     .fetch_all(db_pool)
@@ -387,10 +387,9 @@ pub async fn get_vector_tile(
     let tile_bbox = utils::tile_to_bbox(params.z, params.x, params.y);
 
     match sqlx::query_scalar::<_, Vec<u8>>(
-        "SELECT public.get_tile($1, $2, $3, $4, $5, $6, $7, $8, $9)"
+        "SELECT public.get_tile($1, $2, $3, $4, $5, $6, $7, $8)"
     )
     .bind(&layer.table_name)
-    .bind(&layer.geom_column)
     .bind(params.z as i32)
     .bind(params.x as i32)
     .bind(params.y as i32)

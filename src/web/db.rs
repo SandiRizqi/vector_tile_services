@@ -6,7 +6,6 @@ pub async fn run_migrations(pool: &PgPool) -> Result<(), sqlx::Error> {
         r#"
         CREATE OR REPLACE FUNCTION public.get_tile(
             p_table text,
-            p_geom_col text,
             p_z integer,
             p_x integer,
             p_y integer,
@@ -23,7 +22,7 @@ pub async fn run_migrations(pool: &PgPool) -> Result<(), sqlx::Error> {
             pk_col text;
             sql_query text;
         BEGIN
-            -- 1️⃣ Buat bounding box
+            -- 1️⃣ Buat bounding box dalam SRID 3857
             bbox := ST_MakeEnvelope(p_minx, p_miny, p_maxx, p_maxy, 3857);
 
             -- 2️⃣ Cek kolom PK yang ada: id, gid, atau generate row_number
@@ -35,7 +34,7 @@ pub async fn run_migrations(pool: &PgPool) -> Result<(), sqlx::Error> {
             ORDER BY column_name ASC
             LIMIT 1;
 
-            -- 3️⃣ Buat query dynamic
+            -- 3️⃣ Buat query dynamic menggunakan geom_3857 (sudah dalam SRID 3857)
             IF pk_col IS NULL THEN
                 -- tidak ada id/gid, generate row_number
                 sql_query := format($f$
@@ -44,30 +43,25 @@ pub async fn run_migrations(pool: &PgPool) -> Result<(), sqlx::Error> {
                         SELECT
                             row_number() OVER () AS gid,
                             ST_AsMVTGeom(
-                                ST_Transform(
-                                    CASE
-                                        WHEN %s >= 17 THEN %I
-                                        WHEN %s <= 5 THEN ST_SimplifyVW(%I, %s)
-                                        WHEN %s <= 8 THEN ST_SimplifyVW(%I, %s)
-                                        ELSE ST_SimplifyVW(%I, %s)
-                                    END,
-                                    3857
-                                ),
+                                CASE
+                                    WHEN %s >= 17 THEN geom_3857
+                                    WHEN %s <= 5 THEN ST_SimplifyVW(geom_3857, %s)
+                                    WHEN %s <= 8 THEN ST_SimplifyVW(geom_3857, %s)
+                                    ELSE ST_SimplifyVW(geom_3857, %s)
+                                END,
                                 $1,
                                 4096, 256, true
                             ) AS geom
                         FROM %I
-                        WHERE %I && ST_Transform($1, ST_SRID(%I))
+                        WHERE geom_3857 && $1
                     ) tile
                 $f$,
                     p_table,
-                    p_z, p_geom_col,
-                    p_z, p_geom_col, 1e-6 * POWER(2, 17 - p_z),
-                    p_z, p_geom_col, 1e-7 * POWER(2, 17 - p_z),
-                    p_geom_col, 1e-8 * POWER(2, 17 - p_z),
-                    p_table,
-                    p_geom_col,
-                    p_geom_col
+                    p_z,
+                    p_z, 1e-6 * POWER(2, 17 - p_z),
+                    p_z, 1e-7 * POWER(2, 17 - p_z),
+                    1e-8 * POWER(2, 17 - p_z),
+                    p_table
                 );
             ELSE
                 -- pakai kolom PK yang ada
@@ -77,35 +71,30 @@ pub async fn run_migrations(pool: &PgPool) -> Result<(), sqlx::Error> {
                         SELECT
                             %I AS gid,
                             ST_AsMVTGeom(
-                                ST_Transform(
-                                    CASE
-                                        WHEN %s >= 17 THEN %I
-                                        WHEN %s <= 5 THEN ST_SimplifyVW(%I, %s)
-                                        WHEN %s <= 8 THEN ST_SimplifyVW(%I, %s)
-                                        ELSE ST_SimplifyVW(%I, %s)
-                                    END,
-                                    3857
-                                ),
+                                CASE
+                                    WHEN %s >= 17 THEN geom_3857
+                                    WHEN %s <= 5 THEN ST_SimplifyVW(geom_3857, %s)
+                                    WHEN %s <= 8 THEN ST_SimplifyVW(geom_3857, %s)
+                                    ELSE ST_SimplifyVW(geom_3857, %s)
+                                END,
                                 $1,
                                 4096, 256, true
                             ) AS geom
                         FROM %I
-                        WHERE %I && ST_Transform($1, ST_SRID(%I))
+                        WHERE geom_3857 && $1
                     ) tile
                 $f$,
                     p_table,
                     pk_col,
-                    p_z, p_geom_col,
-                    p_z, p_geom_col, 1e-6 * POWER(2, 17 - p_z),
-                    p_z, p_geom_col, 1e-7 * POWER(2, 17 - p_z),
-                    p_geom_col, 1e-8 * POWER(2, 17 - p_z),
-                    p_table,
-                    p_geom_col,
-                    p_geom_col
+                    p_z,
+                    p_z, 1e-6 * POWER(2, 17 - p_z),
+                    p_z, 1e-7 * POWER(2, 17 - p_z),
+                    1e-8 * POWER(2, 17 - p_z),
+                    p_table
                 );
             END IF;
 
-        
+            -- 4️⃣ Execute query
             EXECUTE sql_query INTO mvt USING bbox;
 
             RETURN COALESCE(mvt, ''::bytea);
